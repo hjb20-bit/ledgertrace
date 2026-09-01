@@ -1,1 +1,3 @@
-<resources>`r`n    <string name="app_name">账迹</string>`r`n</resources>`r`n
+<resources>
+    <string name="app_name">账迹</string>
+</resources>

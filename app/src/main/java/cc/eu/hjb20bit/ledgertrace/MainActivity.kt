@@ -8,17 +8,21 @@ import android.view.*
 import android.widget.*
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
-import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.ViewModelProvider
 import cc.eu.hjb20bit.ledgertrace.data.*
 import cc.eu.hjb20bit.ledgertrace.ui.LedgerViewModel
 import cc.eu.hjb20bit.ledgertrace.ui.format.MarkdownExporter
 import cc.eu.hjb20bit.ledgertrace.ui.format.MoneyFormatter
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
+    private val uiScope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
     private val vm: LedgerViewModel by lazy {
         ViewModelProvider(this)[LedgerViewModel::class.java]
     }
@@ -49,7 +53,12 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         buildRoot()
-        lifecycleScope.launch { vm.state.collect { render() } }
+        uiScope.launch { vm.state.collect { render() } }
+    }
+
+    override fun onDestroy() {
+        uiScope.cancel()
+        super.onDestroy()
     }
 
     private fun buildRoot() {

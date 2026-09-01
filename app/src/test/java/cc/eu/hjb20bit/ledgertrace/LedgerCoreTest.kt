@@ -19,10 +19,31 @@ class LedgerCoreTest {
             BalanceSnapshotEntity(id = 1, accountId = 1, date = "2026-07-24", amountCents = 400000),
             BalanceSnapshotEntity(id = 2, accountId = 1, date = "2026-08-31", amountCents = 300000)
         )
-        val text = MarkdownExporter.create("2026-07-24", "2026-08-31", accounts, balances, emptyList(), emptyList())
+        val transactions = listOf(
+            TransactionEntity(
+                date = "2026-08-01",
+                type = "EXPENSE",
+                title = "午餐",
+                category = "餐饮",
+                amountCents = 1200
+            )
+        )
+        val text = MarkdownExporter.create("2026-07-24", "2026-08-31", accounts, balances, transactions, emptyList())
         assertTrue(text.contains("微信"))
         assertTrue(text.contains("¥-1000.00"))
         assertTrue(text.contains("## 实际收入"))
         assertTrue(text.contains("固定收支仅为计划"))
+        assertFalse(text.contains("分类"))
+        assertFalse(text.contains("餐饮"))
+    }
+
+    @Test fun markdownRequiresSnapshotsOnSelectedDates() {
+        val accounts = listOf(AccountEntity(id = 1, name = "微信"))
+        val balances = listOf(
+            BalanceSnapshotEntity(id = 1, accountId = 1, date = "2026-07-23", amountCents = 400000),
+            BalanceSnapshotEntity(id = 2, accountId = 1, date = "2026-08-31", amountCents = 300000)
+        )
+        val text = MarkdownExporter.create("2026-07-24", "2026-08-31", accounts, balances, emptyList(), emptyList())
+        assertTrue(text.contains("数据不足"))
     }
 }

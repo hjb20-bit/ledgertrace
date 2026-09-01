@@ -1,15 +1,15 @@
 package cc.eu.hjb20bit.ledgertrace
 
 import android.app.*
-import android.content.*
 import android.graphics.Color
 import android.os.Bundle
 import android.text.InputType
 import android.view.*
 import android.widget.*
-import androidx.activity.viewModels
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ViewModelProvider
 import cc.eu.hjb20bit.ledgertrace.data.*
 import cc.eu.hjb20bit.ledgertrace.ui.LedgerViewModel
 import cc.eu.hjb20bit.ledgertrace.ui.format.MarkdownExporter
@@ -19,13 +19,24 @@ import java.text.SimpleDateFormat
 import java.util.*
 
 class MainActivity : AppCompatActivity() {
-    private val vm: LedgerViewModel by viewModels()
+    private val vm: LedgerViewModel by lazy {
+        ViewModelProvider(this)[LedgerViewModel::class.java]
+    }
     private lateinit var content: LinearLayout
     private lateinit var pageTitle: TextView
     private lateinit var pageSubtitle: TextView
     private val navViews = mutableListOf<Triple<ImageView, TextView, Page?>>()
     private var page = Page.HOME
     private var pendingMarkdown = ""
+    private val createMarkdownDocument = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/markdown")
+    ) { uri ->
+        uri ?: return@registerForActivityResult
+        contentResolver.openOutputStream(uri)?.use { output ->
+            output.write(pendingMarkdown.toByteArray(Charsets.UTF_8))
+        }
+        toast("Markdown 已导出")
+    }
     private val primary = Color.rgb(15, 91, 82)
     private val bg = Color.rgb(245, 248, 247)
     private val ink = Color.rgb(27, 40, 38)
@@ -123,8 +134,8 @@ class MainActivity : AppCompatActivity() {
         val result = tv("选择日期后，按账户计算净变化", 13f, muted, false); content.addView(button("比较余额变化", -1) { result.text = compare(start.text.toString(), end.text.toString()) }, margins(0, 10, 0, 0)); content.addView(result, margins(4, 12, 4, 0))
     }
 
-    private fun renderTransactions() { val s = vm.state.value; content.addView(button("＋ 记一笔", -1) { showTransactionDialog(null) }, margins(0, 14, 0, 10)); val list = card(Color.WHITE); s.transactions.forEach { list.addView(transactionRow(it).apply { setOnClickListener { transactionActions(it) } }) }; if (s.transactions.isEmpty()) list.addView(empty("还没有实际收入或支出")); content.addView(list) }
-    private fun renderRecurring() { val s = vm.state.value; content.addView(button("＋ 新增固定收支", -1) { showRecurringDialog(null) }, margins(0, 14, 0, 10)); val list = card(Color.WHITE); s.recurring.forEach { list.addView(recurringRow(it).apply { setOnClickListener { recurringActions(it) } }) }; if (s.recurring.isEmpty()) list.addView(empty("还没有固定收入或支出")); content.addView(list); content.addView(tv("固定收支仅作为计划，不会自动生成实际流水。", 12f, muted, false), margins(4, 12, 4, 0)) }
+    private fun renderTransactions() { val s = vm.state.value; content.addView(button("＋ 记一笔", -1) { showTransactionDialog(null) }, margins(0, 14, 0, 10)); val list = card(Color.WHITE); s.transactions.forEach { transaction -> list.addView(transactionRow(transaction).apply { setOnClickListener { transactionActions(transaction) } }) }; if (s.transactions.isEmpty()) list.addView(empty("还没有实际收入或支出")); content.addView(list) }
+    private fun renderRecurring() { val s = vm.state.value; content.addView(button("＋ 新增固定收支", -1) { showRecurringDialog(null) }, margins(0, 14, 0, 10)); val list = card(Color.WHITE); s.recurring.forEach { recurring -> list.addView(recurringRow(recurring).apply { setOnClickListener { recurringActions(recurring) } }) }; if (s.recurring.isEmpty()) list.addView(empty("还没有固定收入或支出")); content.addView(list); content.addView(tv("固定收支仅作为计划，不会自动生成实际流水。", 12f, muted, false), margins(4, 12, 4, 0)) }
     private fun renderMore() { val c = card(Color.WHITE).apply { setPadding(dp(16), dp(15), dp(16), dp(15)); addView(tv("Markdown 导出", 16f, ink, true)); addView(tv("选择时间段并生成财务报告", 12f, muted, false)); setOnClickListener { showExportDialog() } }; content.addView(c, margins(0, 14, 0, 0)); content.addView(tv("LedgerTrace · 本地离线记账", 12f, muted, false), margins(4, 28, 4, 0)) }
 
     private fun exportOptions(start: EditText, end: EditText, box: LinearLayout) {
@@ -147,8 +158,7 @@ class MainActivity : AppCompatActivity() {
     private fun transactionActions(item: TransactionEntity) = AlertDialog.Builder(this).setItems(arrayOf("编辑", "删除", "取消")) { _, which -> when (which) { 0 -> showTransactionDialog(item); 1 -> confirm("删除这条流水？") { vm.deleteTransaction(item) } } }.show()
     private fun showRecurringDialog(existing: RecurringEntryEntity?) { val box = form(); val type = Spinner(this).apply { adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, arrayOf("收入", "支出")); setSelection(if (existing?.type == "EXPENSE") 1 else 0) }; val name = edit("项目名称", existing?.title ?: ""); val amount = edit("金额", existing?.let { "%.2f".format(Locale.US, it.amountCents / 100.0) } ?: ""); amount.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; val day = edit("每月发生日（1-31）", existing?.dayOfMonth?.toString() ?: "1"); day.inputType = InputType.TYPE_CLASS_NUMBER; val start = edit("生效月份 yyyy-MM", existing?.startMonth ?: monthStart().substring(0, 7)); val note = edit("备注（可选）", existing?.note ?: ""); listOf(type, name, amount, day, start, note).forEach { box.addView(it) }; dialog(if (existing == null) "新增固定收支" else "编辑固定收支", box) { val cents = MoneyFormatter.parseCents(amount.text.toString()); val d = day.text.toString().toIntOrNull(); if (name.text.isNullOrBlank() || cents == null || d == null || d !in 1..31) { toast("请填写合法的项目、金额和日期"); return@dialog }; vm.saveRecurring(RecurringEntryEntity(existing?.id ?: 0, name.text.toString().trim(), if (type.selectedItemPosition == 0) "INCOME" else "EXPENSE", cents, d, start.text.toString().trim(), note = note.text.toString())); page = Page.RECURRING } }
     private fun recurringActions(item: RecurringEntryEntity) = AlertDialog.Builder(this).setItems(arrayOf("编辑", if (item.active) "停用" else "启用", "删除", "取消")) { _, which -> when (which) { 0 -> showRecurringDialog(item); 1 -> vm.toggleRecurring(item); 2 -> confirm("删除这条固定收支？") { vm.deleteRecurring(item) } } }.show()
-    private fun showExportDialog() { val box = form(); val start = dateEdit("起始日期", monthStart()); val end = dateEdit("结束日期", today()); box.addView(start); box.addView(end); exportOptions(start, end, box); dialog("导出 Markdown", box) { val checks = box.tag as Array<*>; pendingMarkdown = MarkdownExporter.create(start.text.toString(), end.text.toString(), vm.state.value.accounts, vm.state.value.balances, vm.state.value.transactions, vm.state.value.recurring, (checks[0] as CheckBox).isChecked, (checks[1] as CheckBox).isChecked, (checks[2] as CheckBox).isChecked, (checks[3] as CheckBox).isChecked); startActivityForResult(Intent(Intent.ACTION_CREATE_DOCUMENT).apply { type = "text/markdown"; putExtra(Intent.EXTRA_TITLE, "ledgertrace-report.md") }, 9001) } }
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) { super.onActivityResult(requestCode, resultCode, data); if (requestCode == 9001 && resultCode == RESULT_OK) data?.data?.let { contentResolver.openOutputStream(it)?.use { out -> out.write(pendingMarkdown.toByteArray(Charsets.UTF_8)) }; toast("Markdown 已导出") } }
+    private fun showExportDialog() { val box = form(); val start = dateEdit("起始日期", monthStart()); val end = dateEdit("结束日期", today()); box.addView(start); box.addView(end); exportOptions(start, end, box); dialog("导出 Markdown", box) { val checks = box.tag as Array<*>; pendingMarkdown = MarkdownExporter.create(start.text.toString(), end.text.toString(), vm.state.value.accounts, vm.state.value.balances, vm.state.value.transactions, vm.state.value.recurring, (checks[0] as CheckBox).isChecked, (checks[1] as CheckBox).isChecked, (checks[2] as CheckBox).isChecked, (checks[3] as CheckBox).isChecked); createMarkdownDocument.launch("ledgertrace-report.md") } }
     private fun compare(start: String, end: String): String { val s = vm.state.value; return s.accounts.filter { it.active }.joinToString("\n") { a -> val b = s.balances.filter { it.accountId == a.id && it.date <= start }.maxByOrNull { it.date }; val e = s.balances.filter { it.accountId == a.id && it.date <= end }.maxByOrNull { it.date }; if (b == null || e == null) "${a.name}：数据不足" else "${a.name}：${if (e.amountCents - b.amountCents >= 0) "+" else ""}${MoneyFormatter.format(e.amountCents - b.amountCents)}" } }
     private fun form() = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(20), 0, dp(20), 0) }
     private fun dialog(t: String, v: View, save: () -> Unit) { AlertDialog.Builder(this).setTitle(t).setView(v).setNegativeButton("取消", null).setPositiveButton("保存") { _, _ -> save() }.show() }

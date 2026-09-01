@@ -195,7 +195,7 @@ class MainActivity : AppCompatActivity() {
             adapter = ArrayAdapter(this@MainActivity, android.R.layout.simple_spinner_dropdown_item, arrayOf("收入", "支出"))
         }
         val name = edit("项目名称", "")
-        val amount = edit("金额，例如 0.07", "").apply {
+        val amount = edit("金额", "").apply {
             inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL
         }
         val account = edit("账户（可选）", "")
@@ -253,7 +253,7 @@ class MainActivity : AppCompatActivity() {
     private fun recurringRow(p: RecurringEntryEntity) = transactionRow(TransactionEntity(date = "每月 ${p.dayOfMonth} 日", type = p.type, title = p.title, category = "固定收支", amountCents = p.amountCents)).apply { alpha = if (p.active) 1f else .45f }
     private fun section(name: String, action: (() -> Unit)?) { val row = LinearLayout(this).apply { orientation = LinearLayout.HORIZONTAL; gravity = Gravity.CENTER_VERTICAL }; row.addView(tv(name, 17f, ink, true), LinearLayout.LayoutParams(0, -2, 1f)); action?.let { row.addView(button("查看全部", -2, it)) }; content.addView(row, margins(0, 22, 0, 10)) }
 
-    private fun showBalanceDialog(existing: BalanceSnapshotEntity?) { val s = vm.state.value; val box = form(); val account = edit("账户名称", existing?.let { s.accounts.firstOrNull { a -> a.id == it.accountId }?.name ?: "" } ?: ""); val amount = edit("余额，例如 3000.00", existing?.let { "%.2f".format(Locale.US, it.amountCents / 100.0) } ?: ""); amount.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; val date = dateEdit("日期", existing?.date ?: today()); val note = edit("备注（可选）", existing?.note ?: ""); listOf(account, amount, date, note).forEach { box.addView(it) }; dialog(if (existing == null) "记录余额" else "编辑余额", box) { val cents = MoneyFormatter.parseCents(amount.text.toString()); if (account.text.isNullOrBlank() || cents == null) { toast("请填写账户名称和合法金额"); return@dialog }; vm.saveSnapshot(existing?.id ?: 0, account.text.toString().trim(), date.text.toString().trim(), cents, note.text.toString()); page = Page.BALANCES } }
+    private fun showBalanceDialog(existing: BalanceSnapshotEntity?) { val s = vm.state.value; val box = form(); val account = edit("账户名称", existing?.let { s.accounts.firstOrNull { a -> a.id == it.accountId }?.name ?: "" } ?: ""); val amount = edit("余额", existing?.let { "%.2f".format(Locale.US, it.amountCents / 100.0) } ?: ""); amount.inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL; val date = dateEdit("日期", existing?.date ?: today()); val note = edit("备注（可选）", existing?.note ?: ""); listOf(account, amount, date, note).forEach { box.addView(it) }; dialog(if (existing == null) "记录余额" else "编辑余额", box) { val cents = MoneyFormatter.parseCents(amount.text.toString()); if (account.text.isNullOrBlank() || cents == null) { toast("请填写账户名称和合法金额"); return@dialog }; vm.saveSnapshot(existing?.id ?: 0, account.text.toString().trim(), date.text.toString().trim(), cents, note.text.toString()); page = Page.BALANCES } }
     private fun balanceActions(item: BalanceSnapshotEntity) = AlertDialog.Builder(this).setItems(arrayOf("编辑", "删除", "取消")) { _, which -> when (which) { 0 -> showBalanceDialog(item); 1 -> confirm("删除这条余额快照？") { vm.deleteSnapshot(item) } } }.show()
     private fun showTransactionDialog(existing: TransactionEntity?) {
         if (existing == null) {

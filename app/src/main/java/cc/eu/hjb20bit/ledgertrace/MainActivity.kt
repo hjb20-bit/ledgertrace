@@ -1,20 +1,12 @@
 package cc.eu.hjb20bit.ledgertrace
 
 import android.app.AlertDialog
-import android.app.DatePickerDialog
-import android.content.Intent
 import android.graphics.Color
 import android.os.Bundle
 import android.text.InputType
-import android.view.Gravity
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
-import org.json.JSONArray
-import org.json.JSONObject
-import java.text.SimpleDateFormat
-import java.util.Calendar
-import java.util.Locale
 
 class MainActivity : AppCompatActivity() {
     private val primary = Color.rgb(15, 91, 82)
@@ -52,7 +44,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun buildRoot(): View {
-        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(background) }
+        val root = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setBackgroundColor(this@MainActivity.background) }
         val header = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(24), dp(24), dp(12)) }
         pageTitle = textView("\u8d26\u8ff9", 28f, ink, true)
         pageSubtitle = textView("\u8bb0\u5f55\u6bcf\u4e00\u7b14\uff0c\u4e5f\u770b\u6e05\u6bcf\u4e00\u6b65", 13f, muted, false)
